@@ -3,6 +3,7 @@ import session from 'express-session';
 import connectPgSimple from 'connect-pg-simple';
 import pool from './db/pool.js';
 import authRouter from './routes/auth.js';
+import reposRouter from './routes/repos.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -26,6 +27,7 @@ app.use(session({
 }));
 
 app.use('/api/auth', authRouter);
+app.use('/api/repos', reposRouter);
 
 app.get('/api/me', (req, res) => {
   if (!req.session.userId) return res.status(401).json({ error: 'not logged in' });
