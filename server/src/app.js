@@ -2,6 +2,7 @@ import express from 'express';
 import session from 'express-session';
 import connectPgSimple from 'connect-pg-simple';
 import pool from './db/pool.js';
+import authRouter from './routes/auth.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -23,8 +24,6 @@ app.use(session({
     maxAge: 7 * 24 * 60 * 60 * 1000,
   },
 }));
-
-import authRouter from './routes/auth.js';
 
 app.use('/api/auth', authRouter);
 
