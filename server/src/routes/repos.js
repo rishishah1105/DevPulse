@@ -1,6 +1,16 @@
 import { Router } from 'express';
 import pool from '../db/pool.js';
 import { fetchIssues } from '../services/github.js';
+import { startSync } from '../services/sync.js';
+
+// Returns true if the logged-in user tracks this repo (authorization check)
+async function userOwnsRepo(userId, repoId) {
+  const result = await pool.query(
+    'SELECT 1 FROM user_repositories WHERE user_id = $1 AND repository_id = $2',
+    [userId, repoId]
+  );
+  return result.rows.length > 0;
+}
 
 const router = Router();
 
@@ -80,6 +90,56 @@ router.post('/', async (req, res) => {
   }
 
   res.status(201).json(savedRepo);
+});
+
+// POST /api/repos/:id/sync — start a sync (202), or 409 if already running, 429 if cooling down
+router.post('/:id/sync', async (req, res) => {
+  const repoId = parseInt(req.params.id, 10);
+
+  if (!(await userOwnsRepo(req.session.userId, repoId))) {
+    return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'repo not found' } });
+  }
+
+  const { rows } = await pool.query(
+    'SELECT sync_status, last_synced_at FROM repositories WHERE id = $1',
+    [repoId]
+  );
+  const repo = rows[0];
+
+  if (repo.sync_status === 'running') {
+    return res.status(409).json({ error: { code: 'SYNC_RUNNING', message: 'sync already running' } });
+  }
+
+  // 2-minute cooldown between syncs
+  if (repo.last_synced_at) {
+    const secondsSinceLast = (Date.now() - new Date(repo.last_synced_at).getTime()) / 1000;
+    if (secondsSinceLast < 120) {
+      const retryAfter = Math.ceil(120 - secondsSinceLast);
+      res.set('Retry-After', String(retryAfter));
+      return res.status(429).json({ error: { code: 'COOLDOWN', message: `Wait ${retryAfter}s before syncing again` } });
+    }
+  }
+
+  // Fire and forget — do NOT await
+  startSync(repoId, req.session.accessToken);
+  res.status(202).json({ message: 'sync started' });
+});
+
+// GET /api/repos/:id/sync-status — polled by the UI to show progress
+router.get('/:id/sync-status', async (req, res) => {
+  const repoId = parseInt(req.params.id, 10);
+
+  if (!(await userOwnsRepo(req.session.userId, repoId))) {
+    return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'repo not found' } });
+  }
+
+  const { rows } = await pool.query(
+    `SELECT sync_status, sync_started_at, last_synced_at,
+            sync_items_done, sync_pages_total, sync_error, retry_after
+     FROM repositories WHERE id = $1`,
+    [repoId]
+  );
+  res.json(rows[0]);
 });
 
 export default router;
