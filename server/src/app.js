@@ -4,6 +4,9 @@ import connectPgSimple from 'connect-pg-simple';
 import pool from './db/pool.js';
 import authRouter from './routes/auth.js';
 import reposRouter from './routes/repos.js';
+import itemsRouter from './routes/items.js';
+import { requireAuth } from './middleware/requireAuth.js';
+import { rateLimiter } from './middleware/rateLimiter.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -27,10 +30,10 @@ app.use(session({
 }));
 
 app.use('/api/auth', authRouter);
-app.use('/api/repos', reposRouter);
+app.use('/api/repos', rateLimiter, reposRouter);
+app.use('/api/repos/:id/items', rateLimiter, itemsRouter);
 
-app.get('/api/me', (req, res) => {
-  if (!req.session.userId) return res.status(401).json({ error: 'not logged in' });
+app.get('/api/me', requireAuth, (req, res) => {
   res.json({ userId: req.session.userId, login: req.session.login });
 });
 

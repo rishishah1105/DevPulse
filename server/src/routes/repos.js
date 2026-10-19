@@ -2,6 +2,7 @@ import { Router } from 'express';
 import pool from '../db/pool.js';
 import { fetchIssues } from '../services/github.js';
 import { startSync } from '../services/sync.js';
+import { requireAuth } from '../middleware/requireAuth.js';
 
 // Returns true if the logged-in user tracks this repo (authorization check)
 async function userOwnsRepo(userId, repoId) {
@@ -15,7 +16,7 @@ async function userOwnsRepo(userId, repoId) {
 const router = Router();
 
 // GET /api/repos — list my tracked repos
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   const result = await pool.query(
     `SELECT r.* FROM repositories r
      JOIN user_repositories ur ON ur.repository_id = r.id
@@ -27,7 +28,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/repos — add a repo by URL
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   const { url } = req.body;
 
   // parse owner/repo from URL
@@ -93,7 +94,7 @@ router.post('/', async (req, res) => {
 });
 
 // POST /api/repos/:id/sync — start a sync (202), or 409 if already running, 429 if cooling down
-router.post('/:id/sync', async (req, res) => {
+router.post('/:id/sync', requireAuth, async (req, res) => {
   const repoId = parseInt(req.params.id, 10);
 
   if (!(await userOwnsRepo(req.session.userId, repoId))) {
@@ -126,7 +127,7 @@ router.post('/:id/sync', async (req, res) => {
 });
 
 // GET /api/repos/:id/sync-status — polled by the UI to show progress
-router.get('/:id/sync-status', async (req, res) => {
+router.get('/:id/sync-status', requireAuth, async (req, res) => {
   const repoId = parseInt(req.params.id, 10);
 
   if (!(await userOwnsRepo(req.session.userId, repoId))) {
