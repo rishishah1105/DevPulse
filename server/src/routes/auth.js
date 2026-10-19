@@ -71,7 +71,7 @@ router.get('/github/callback', async (req, res) => {
   req.session.login = githubUser.login;
   req.session.accessToken = accessToken;
 
-  res.redirect('/');
+  res.redirect('/repos');
 });
 
 // Logout

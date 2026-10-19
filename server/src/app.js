@@ -8,6 +8,7 @@ import itemsRouter from './routes/items.js';
 import metricsRouter from './routes/metrics.js';
 import { requireAuth } from './middleware/requireAuth.js';
 import { rateLimiter } from './middleware/rateLimiter.js';
+import { errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -42,6 +43,8 @@ app.get('/api/me', requireAuth, (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({ ok: true });
 });
+
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
