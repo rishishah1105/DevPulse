@@ -5,6 +5,7 @@ import pool from './db/pool.js';
 import authRouter from './routes/auth.js';
 import reposRouter from './routes/repos.js';
 import itemsRouter from './routes/items.js';
+import metricsRouter from './routes/metrics.js';
 import { requireAuth } from './middleware/requireAuth.js';
 import { rateLimiter } from './middleware/rateLimiter.js';
 
@@ -32,6 +33,7 @@ app.use(session({
 app.use('/api/auth', authRouter);
 app.use('/api/repos', rateLimiter, reposRouter);
 app.use('/api/repos/:id/items', rateLimiter, itemsRouter);
+app.use('/api/repos/:id/metrics', rateLimiter, metricsRouter);
 
 app.get('/api/me', requireAuth, (req, res) => {
   res.json({ userId: req.session.userId, login: req.session.login });

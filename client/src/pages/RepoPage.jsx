@@ -4,6 +4,7 @@ import { useParams, Link } from 'react-router-dom';
 export default function RepoPage() {
   const { id } = useParams();
   const [repo, setRepo] = useState(null);
+  const [metrics, setMetrics] = useState(null);
   const [items, setItems] = useState(null);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState('');
@@ -19,6 +20,9 @@ export default function RepoPage() {
     fetch(`/api/repos`)
       .then(r => r.json())
       .then(repos => setRepo(repos.find(r => String(r.id) === String(id)) ?? null));
+    fetch(`/api/repos/${id}/metrics`)
+      .then(r => r.ok ? r.json() : null)
+      .then(setMetrics);
   }, [id]);
 
   useEffect(() => {
@@ -48,6 +52,37 @@ export default function RepoPage() {
         <span>/</span>
         <span className="text-white">{repo?.full_name ?? id}</span>
       </div>
+
+      {/* Metrics cards */}
+      {metrics === null ? (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="bg-gray-900 border border-gray-800 rounded p-4 animate-pulse h-20" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <MetricCard label="Open issues" value={metrics.open_issues} />
+          <MetricCard label="Open PRs" value={metrics.open_prs} />
+          <MetricCard label="Stale items" value={metrics.stale_items} />
+          <MetricCard label="Unassigned issues" value={metrics.unassigned_open_issues} />
+          <MetricCard
+            label="Median close time"
+            value={metrics.median_time_to_close_days != null ? `${metrics.median_time_to_close_days}d` : null}
+            empty="No data"
+          />
+        </div>
+      )}
+
+      {metrics?.last_synced_at && (
+        <p className="text-xs text-gray-500">
+          Data as of {new Date(metrics.last_synced_at).toLocaleString()}
+          {metrics.sync_status === 'running' && ' · sync in progress'}
+        </p>
+      )}
+      {!metrics?.last_synced_at && metrics !== null && (
+        <p className="text-xs text-yellow-600">Not synced yet — run a sync to see data.</p>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 text-sm">
@@ -127,7 +162,7 @@ export default function RepoPage() {
         </div>
       )}
 
-      {/* Pagination */}
+      {/* Pagination  */}
       {totalPages > 1 && (
         <div className="flex items-center gap-3 text-sm text-gray-400">
           <button
@@ -147,6 +182,17 @@ export default function RepoPage() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function MetricCard({ label, value, empty = '—' }) {
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded p-4 flex flex-col gap-1">
+      <span className="text-xs text-gray-500">{label}</span>
+      <span className="text-2xl font-semibold">
+        {value != null ? value : <span className="text-gray-600 text-base">{empty}</span>}
+      </span>
     </div>
   );
 }
