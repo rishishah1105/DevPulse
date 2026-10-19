@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function RepoPage() {
   const { id } = useParams();
@@ -82,6 +83,32 @@ export default function RepoPage() {
       )}
       {!metrics?.last_synced_at && metrics !== null && (
         <p className="text-xs text-yellow-600">Not synced yet — run a sync to see data.</p>
+      )}
+
+      {/* Weekly activity chart */}
+      {metrics?.weekly_activity?.length > 0 && (
+        <div className="bg-gray-900 border border-gray-800 rounded p-4">
+          <h3 className="text-sm font-medium text-gray-400 mb-4">Opened vs closed per week (last 12 weeks)</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={metrics.weekly_activity} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <XAxis
+                dataKey="week"
+                tickFormatter={w => new Date(w).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                tick={{ fontSize: 11, fill: '#9ca3af' }}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
+              <Tooltip
+                contentStyle={{ background: '#111827', border: '1px solid #1f2937', borderRadius: 6 }}
+                labelFormatter={w => new Date(w).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+              />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Bar dataKey="opened" name="Opened" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="closed" name="Closed" fill="#22c55e" radius={[2, 2, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       )}
 
       {/* Filters */}

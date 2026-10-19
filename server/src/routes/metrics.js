@@ -20,7 +20,7 @@ router.get('/', requireAuth, async (req, res) => {
     return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'repo not found' } });
   }
 
-  const [countsResult, medianResult, repoResult] = await Promise.all([
+  const [countsResult, medianResult, repoResult, openedResult, closedResult] = await Promise.all([
     // All counts in one query using FILTER — one DB round-trip
     pool.query(
       `SELECT
@@ -51,11 +51,50 @@ router.get('/', requireAuth, async (req, res) => {
       'SELECT last_synced_at, sync_status FROM repositories WHERE id = $1',
       [repoId]
     ),
+
+    // Issues opened per week for last 12 weeks
+    pool.query(
+      `SELECT date_trunc('week', created_at_gh) AS week, COUNT(*)::int AS count
+       FROM github_items
+       WHERE repository_id = $1
+         AND type = 'issue'
+         AND created_at_gh > now() - interval '12 weeks'
+       GROUP BY week
+       ORDER BY week`,
+      [repoId]
+    ),
+
+    // Issues closed per week for last 12 weeks
+    pool.query(
+      `SELECT date_trunc('week', closed_at_gh) AS week, COUNT(*)::int AS count
+       FROM github_items
+       WHERE repository_id = $1
+         AND type = 'issue'
+         AND state = 'closed'
+         AND closed_at_gh > now() - interval '12 weeks'
+       GROUP BY week
+       ORDER BY week`,
+      [repoId]
+    ),
   ]);
 
   const counts = countsResult.rows[0];
   const medianDays = medianResult.rows[0]?.median_days;
   const { last_synced_at, sync_status } = repoResult.rows[0];
+
+  // Merge opened and closed rows by week into one array
+  const weekMap = new Map();
+  for (const row of openedResult.rows) {
+    const key = row.week.toISOString();
+    weekMap.set(key, { week: key, opened: row.count, closed: 0 });
+  }
+  for (const row of closedResult.rows) {
+    const key = row.week.toISOString();
+    const existing = weekMap.get(key);
+    if (existing) existing.closed = row.count;
+    else weekMap.set(key, { week: key, opened: 0, closed: row.count });
+  }
+  const weekly_activity = Array.from(weekMap.values()).sort((a, b) => a.week.localeCompare(b.week));
 
   res.json({
     open_issues:            parseInt(counts.open_issues, 10),
@@ -65,6 +104,7 @@ router.get('/', requireAuth, async (req, res) => {
     median_time_to_close_days: medianDays != null ? parseFloat(parseFloat(medianDays).toFixed(1)) : null,
     last_synced_at,
     sync_status,
+    weekly_activity,
   });
 });
 
