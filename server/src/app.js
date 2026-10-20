@@ -2,6 +2,10 @@ import express from 'express';
 import session from 'express-session';
 import connectPgSimple from 'connect-pg-simple';
 import pool from './db/pool.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import authRouter from './routes/auth.js';
 import reposRouter from './routes/repos.js';
 import itemsRouter from './routes/items.js';
@@ -43,6 +47,13 @@ app.get('/api/me', requireAuth, (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({ ok: true });
 });
+
+// Serve built React app in production
+if (process.env.NODE_ENV === 'production') {
+  const dist = path.join(__dirname, '../../client/dist');
+  app.use(express.static(dist));
+  app.get('*', (_req, res) => res.sendFile(path.join(dist, 'index.html')));
+}
 
 app.use(errorHandler);
 
