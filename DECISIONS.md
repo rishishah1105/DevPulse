@@ -37,10 +37,10 @@
 **Trade-off:** slightly more complex query; clearly worth it for correctness.
 
 ## Polling vs SSE
-**Decision:** UI polls `/sync-status` every 3 seconds with `setInterval`.
-**Alternatives:** Server-Sent Events (SSE) — server pushes updates to the browser.
-**Why:** polling is a simple regular HTTP request — easy to understand, debug and explain. SSE requires a persistent connection per user, reconnection logic, and more complex server handling. The 3-second interval is fast enough for a progress bar. SSE is listed as a stretch goal for after core works.
-**Trade-off:** polling makes unnecessary requests when nothing has changed; SSE would be more efficient at scale.
+**Decision:** started with `setInterval` polling every 3 seconds; upgraded to Server-Sent Events (SSE) once core was working.
+**Alternatives:** WebSockets (bidirectional, overkill here — the browser never needs to push mid-sync data); long-polling (a hybrid that's more complex than either).
+**Why polling first:** polling is a plain HTTP request — easy to understand and debug. It let the core sync flow work before adding the SSE layer. **Why SSE after:** with polling, the browser makes a request every 3 seconds regardless of whether anything changed — ~20 requests per minute per user. SSE holds one persistent connection open and the server writes to it only when there's new data. The browser gets live item counts (e.g. "Syncing… 4,200 items") instead of a stale snapshot. The server uses a Node.js `EventEmitter` as the bridge between the background sync process and the open SSE connection — sync emits an event after each page, the SSE route handler writes it to the response.
+**Trade-off:** SSE connections stay open — one per user watching a sync. On Render, `X-Accel-Buffering: no` is needed to stop nginx buffering the stream. The old `/sync-status` polling endpoint is kept as a fallback for other parts of the UI (ReposPage still polls it).
 
 ## Token bucket vs fixed window
 **Decision:** token bucket rate limiter keyed by user ID.
