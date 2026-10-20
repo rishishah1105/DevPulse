@@ -46,6 +46,13 @@ app.get('/api/health', (req, res) => {
 
 app.use(errorHandler);
 
+// Reset any repos left in 'running' state from a previous server crash
+pool.query(
+  `UPDATE repositories SET sync_status = 'failed', sync_error = 'Sync interrupted by server restart' WHERE sync_status = 'running'`
+).then(({ rowCount }) => {
+  if (rowCount > 0) console.log(`[startup] Reset ${rowCount} stuck sync(s) to failed`);
+}).catch(err => console.error('[startup] Failed to clean up stuck syncs:', err));
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
