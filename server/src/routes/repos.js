@@ -137,6 +137,21 @@ router.get('/github-discover', requireAuth, async (req, res) => {
   res.json(result);
 });
 
+// GET /api/repos/:id/sync-history — last 5 sync runs
+router.get('/:id/sync-history', requireAuth, async (req, res) => {
+  const repoId = parseInt(req.params.id, 10);
+  if (!(await userOwnsRepo(req.session.userId, repoId))) {
+    return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'repo not found' } });
+  }
+  const { rows } = await pool.query(
+    `SELECT id, started_at, finished_at, status, items_synced, error
+     FROM sync_runs WHERE repository_id = $1
+     ORDER BY started_at DESC LIMIT 5`,
+    [repoId]
+  );
+  res.json(rows);
+});
+
 // POST /api/repos/:id/sync — start a sync (202), or 409 if already running, 429 if cooling down
 router.post('/:id/sync', requireAuth, async (req, res) => {
   const repoId = parseInt(req.params.id, 10);

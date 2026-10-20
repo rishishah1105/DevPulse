@@ -8,6 +8,7 @@ export default function RepoPage() {
   const { id } = useParams();
   const [repo, setRepo] = useState(null);
   const [metrics, setMetrics] = useState(null);
+  const [syncHistory, setSyncHistory] = useState([]);
   const [items, setItems] = useState(null);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState('');
@@ -49,6 +50,9 @@ export default function RepoPage() {
     fetch(`/api/repos/${id}/metrics`)
       .then(r => r.ok ? r.json() : null)
       .then(setMetrics);
+    fetch(`/api/repos/${id}/sync-history`)
+      .then(r => r.ok ? r.json() : [])
+      .then(setSyncHistory);
   }, [id]);
 
   useEffect(() => {
@@ -213,6 +217,36 @@ export default function RepoPage() {
             <Legend color="var(--state-closed)" label="Closed" />
           </div>
         </motion.div>
+      )}
+
+      {/* Sync history */}
+      {syncHistory.length > 0 && (
+        <div className="bg-card border border-border rounded-[20px] overflow-hidden">
+          <div className="px-5 py-3 border-b border-border">
+            <h3 className="text-sm font-semibold text-foreground">Sync history</h3>
+          </div>
+          <table className="w-full text-xs">
+            <tbody>
+              {syncHistory.map(run => (
+                <tr key={run.id} className="border-b border-border last:border-0 hover:bg-card-raised transition-colors">
+                  <td className="px-5 py-3 w-6">
+                    {run.status === 'succeeded' && <span className="text-state-open">✓</span>}
+                    {run.status === 'failed'    && <span className="text-state-failed">✗</span>}
+                    {run.status === 'running'   && <span className="text-state-syncing">↻</span>}
+                  </td>
+                  <td className="px-3 py-3 font-medium text-foreground w-24">{run.status}</td>
+                  <td className="px-3 py-3 text-muted-foreground">{relativeTime(run.started_at)}</td>
+                  <td className="px-3 py-3 text-subtle-foreground font-mono">
+                    {run.items_synced > 0 ? `${run.items_synced.toLocaleString()} items` : '—'}
+                  </td>
+                  <td className="px-3 py-3 text-state-failed truncate max-w-xs">
+                    {run.error ?? ''}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {/* Filter pills */}

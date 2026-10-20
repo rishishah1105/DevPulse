@@ -24,9 +24,16 @@ export async function startSync(repoId, accessToken) {
   );
   if (!lockResult.rows[0]) return;
 
+  // Insert a sync_runs row so we have a history entry for this run
+  const runResult = await pool.query(
+    `INSERT INTO sync_runs (repository_id, status) VALUES ($1, 'running') RETURNING id`,
+    [repoId]
+  );
+  const runId = runResult.rows[0].id;
 
   // Record the cursor now, before we fetch anything (see DevPulse.md §9.6)
   const syncStartedAt = new Date();
+  let totalItemsSynced = 0;
 
   try {
     // --- 2. Load repo info from DB -----------------------------------------
@@ -61,14 +68,14 @@ export async function startSync(repoId, accessToken) {
           const retryTime = retryAfter
             ? new Date(Date.now() + parseInt(retryAfter, 10) * 1000)
             : null;
-          await markFailed(repoId, 'Rate limited by GitHub', retryTime);
+          await markFailed(repoId, runId, 'Rate limited by GitHub', retryTime);
           return;
         }
         if (res.status === 404) {
-          await markFailed(repoId, 'Repository not found or made private');
+          await markFailed(repoId, runId, 'Repository not found or made private');
           return;
         }
-        await markFailed(repoId, `GitHub API error: ${res.status}`);
+        await markFailed(repoId, runId, `GitHub API error: ${res.status}`);
         return;
       }
 
@@ -78,7 +85,7 @@ export async function startSync(repoId, accessToken) {
 
       if (remaining < RATE_LIMIT_SAFETY) {
         await markFailed(
-          repoId,
+          repoId, runId,
           'Paused: GitHub rate limit low — retry after reset',
           new Date(resetAt * 1000)
         );
@@ -146,6 +153,7 @@ export async function startSync(repoId, accessToken) {
 
       // --- 4e. Update progress counter -------------------------------------
       pagesDone++;
+      totalItemsSynced += items.length;
       await pool.query(
         'UPDATE repositories SET sync_items_done = sync_items_done + $1 WHERE id = $2',
         [items.length, repoId]
@@ -155,29 +163,41 @@ export async function startSync(repoId, accessToken) {
       url = links.next ?? null;
     }
 
-    // --- 5. Sync complete — save cursor and mark succeeded -----------------
-    await pool.query(
-      `UPDATE repositories
-       SET sync_status = 'succeeded',
-           last_synced_at = now(),
-           last_sync_cursor = $1,
-           sync_error = NULL,
-           retry_after = NULL
-       WHERE id = $2`,
-      [syncStartedAt.toISOString(), repoId]
-    );
+    // --- 5. Sync complete — save cursor, mark succeeded, log run ----------
+    await Promise.all([
+      pool.query(
+        `UPDATE repositories
+         SET sync_status = 'succeeded',
+             last_synced_at = now(),
+             last_sync_cursor = $1,
+             sync_error = NULL,
+             retry_after = NULL
+         WHERE id = $2`,
+        [syncStartedAt.toISOString(), repoId]
+      ),
+      pool.query(
+        `UPDATE sync_runs SET status = 'succeeded', finished_at = now(), items_synced = $1 WHERE id = $2`,
+        [totalItemsSynced, runId]
+      ),
+    ]);
   } catch (err) {
-    await markFailed(repoId, err.message);
+    await markFailed(repoId, runId, err.message);
   }
 }
 
-async function markFailed(repoId, message, retryAfter = null) {
-  await pool.query(
-    `UPDATE repositories
-     SET sync_status = 'failed',
-         sync_error = $1,
-         retry_after = $2
-     WHERE id = $3`,
-    [message, retryAfter, repoId]
-  );
+async function markFailed(repoId, runId, message, retryAfter = null) {
+  await Promise.all([
+    pool.query(
+      `UPDATE repositories
+       SET sync_status = 'failed',
+           sync_error = $1,
+           retry_after = $2
+       WHERE id = $3`,
+      [message, retryAfter, repoId]
+    ),
+    pool.query(
+      `UPDATE sync_runs SET status = 'failed', finished_at = now(), error = $1 WHERE id = $2`,
+      [message, runId]
+    ),
+  ]);
 }
