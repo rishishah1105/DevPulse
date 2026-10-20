@@ -93,6 +93,45 @@ router.post('/', requireAuth, async (req, res) => {
   res.status(201).json(savedRepo);
 });
 
+// GET /api/repos/github-discover — user's own public GitHub repos (for discovery tab)
+router.get('/github-discover', requireAuth, async (req, res) => {
+  const ghRes = await fetch('https://api.github.com/user/repos?type=owner&sort=updated&per_page=30', {
+    headers: {
+      Authorization: `Bearer ${req.session.accessToken}`,
+      'User-Agent': 'devpulse',
+      Accept: 'application/vnd.github+json',
+    },
+  });
+  if (!ghRes.ok) {
+    return res.status(502).json({ error: { code: 'GITHUB_ERROR', message: 'Failed to fetch repos from GitHub' } });
+  }
+  const ghRepos = await ghRes.json();
+
+  // Which ones does this user already track in DevPulse?
+  const { rows } = await pool.query(
+    `SELECT r.github_repo_id, r.id AS devpulse_id
+     FROM repositories r
+     JOIN user_repositories ur ON ur.repository_id = r.id
+     WHERE ur.user_id = $1`,
+    [req.session.userId]
+  );
+  const trackedMap = new Map(rows.map(r => [r.github_repo_id, r.devpulse_id]));
+
+  const result = ghRepos
+    .filter(r => !r.private)
+    .map(r => ({
+      github_repo_id: r.id,
+      full_name: r.full_name,
+      description: r.description,
+      html_url: r.html_url,
+      open_issues_count: r.open_issues_count,
+      tracked: trackedMap.has(r.id),
+      devpulse_id: trackedMap.get(r.id) ?? null,
+    }));
+
+  res.json(result);
+});
+
 // POST /api/repos/:id/sync — start a sync (202), or 409 if already running, 429 if cooling down
 router.post('/:id/sync', requireAuth, async (req, res) => {
   const repoId = parseInt(req.params.id, 10);
