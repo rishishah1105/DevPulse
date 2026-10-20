@@ -1,5 +1,6 @@
 import pool from '../db/pool.js';
 import { parseLinkHeader, extractPageNumber } from './linkHeader.js';
+import { syncEmitter } from './syncEmitter.js';
 
 const RATE_LIMIT_SAFETY = 50; // stop syncing if fewer than this many requests remain
 
@@ -158,6 +159,11 @@ export async function startSync(repoId, accessToken) {
         'UPDATE repositories SET sync_items_done = sync_items_done + $1 WHERE id = $2',
         [items.length, repoId]
       );
+      syncEmitter.emit(`sync:${repoId}`, {
+        sync_status: 'running',
+        sync_items_done: totalItemsSynced,
+        sync_pages_total: pagesTotal,
+      });
 
       // Advance to the next page, or exit loop
       url = links.next ?? null;
@@ -180,6 +186,7 @@ export async function startSync(repoId, accessToken) {
         [totalItemsSynced, runId]
       ),
     ]);
+    syncEmitter.emit(`sync:${repoId}`, { sync_status: 'succeeded', sync_items_done: totalItemsSynced });
   } catch (err) {
     await markFailed(repoId, runId, err.message);
   }
@@ -200,4 +207,5 @@ async function markFailed(repoId, runId, message, retryAfter = null) {
       [message, runId]
     ),
   ]);
+  syncEmitter.emit(`sync:${repoId}`, { sync_status: 'failed', sync_error: message });
 }

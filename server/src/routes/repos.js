@@ -2,6 +2,7 @@ import { Router } from 'express';
 import pool from '../db/pool.js';
 import { fetchIssues } from '../services/github.js';
 import { startSync } from '../services/sync.js';
+import { syncEmitter } from '../services/syncEmitter.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { userOwnsRepo } from '../middleware/userOwnsRepo.js';
 
@@ -183,6 +184,51 @@ router.post('/:id/sync', requireAuth, async (req, res) => {
   // Fire and forget — do NOT await
   startSync(repoId, req.session.accessToken);
   res.status(202).json({ message: 'sync started' });
+});
+
+// GET /api/repos/:id/sync-stream — SSE stream; pushes sync progress until finished
+router.get('/:id/sync-stream', requireAuth, async (req, res) => {
+  const repoId = parseInt(req.params.id, 10);
+  if (!(await userOwnsRepo(req.session.userId, repoId))) {
+    return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'repo not found' } });
+  }
+
+  const { rows } = await pool.query(
+    `SELECT sync_status, sync_items_done, sync_pages_total, sync_error FROM repositories WHERE id = $1`,
+    [repoId]
+  );
+  const current = rows[0];
+
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no', // tell nginx/Render not to buffer the stream
+  });
+  res.flushHeaders();
+
+  // Send the current state immediately so the client has something on connect
+  res.write(`data: ${JSON.stringify(current)}\n\n`);
+
+  // If sync isn't running, there's nothing to stream
+  if (current.sync_status !== 'running') {
+    return res.end();
+  }
+
+  function onUpdate(data) {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+    if (data.sync_status !== 'running') {
+      cleanup();
+      res.end();
+    }
+  }
+
+  function cleanup() {
+    syncEmitter.removeListener(`sync:${repoId}`, onUpdate);
+  }
+
+  syncEmitter.on(`sync:${repoId}`, onUpdate);
+  req.on('close', cleanup); // clean up if the browser tab closes
 });
 
 // GET /api/repos/:id/sync-status — polled by the UI to show progress

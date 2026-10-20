@@ -18,8 +18,33 @@ export default function RepoPage() {
   const [stale, setStale] = useState(false);
   const [page, setPage] = useState(1);
   const limit = 25;
+  const [liveSync, setLiveSync] = useState(null);
   const [syncMsg, setSyncMsg] = useState('');
-  const syncPoll = useRef(null);
+  const syncEs = useRef(null);
+
+  function openSyncStream() {
+    if (syncEs.current) syncEs.current.close();
+    const es = new EventSource(`/api/repos/${id}/sync-stream`);
+    syncEs.current = es;
+
+    es.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      setLiveSync(data);
+      if (data.sync_status !== 'running') {
+        es.close();
+        syncEs.current = null;
+        setLiveSync(null);
+        fetch(`/api/repos/${id}/metrics`).then(r => r.ok ? r.json() : null).then(setMetrics);
+        fetch(`/api/repos/${id}/sync-history`).then(r => r.ok ? r.json() : []).then(setSyncHistory);
+      }
+    };
+
+    es.onerror = () => {
+      es.close();
+      syncEs.current = null;
+      setLiveSync(null);
+    };
+  }
 
   async function handleSync() {
     setSyncMsg('');
@@ -28,20 +53,10 @@ export default function RepoPage() {
     if (res.status === 409) { setSyncMsg('A sync is already running for this repository.'); return; }
     if (res.status === 429) { setSyncMsg(data.error?.message ?? 'You can sync again shortly.'); return; }
     if (!res.ok) { setSyncMsg('Failed to start sync.'); return; }
-    if (syncPoll.current) clearInterval(syncPoll.current);
-    syncPoll.current = setInterval(async () => {
-      const r = await fetch(`/api/repos/${id}/sync-status`);
-      if (!r.ok) return;
-      const s = await r.json();
-      if (s.sync_status !== 'running') {
-        clearInterval(syncPoll.current);
-        syncPoll.current = null;
-        fetch(`/api/repos/${id}/metrics`).then(r => r.ok ? r.json() : null).then(setMetrics);
-      }
-    }, 3000);
+    openSyncStream();
   }
 
-  useEffect(() => () => { if (syncPoll.current) clearInterval(syncPoll.current); }, []);
+  useEffect(() => () => { if (syncEs.current) syncEs.current.close(); }, []);
 
   useEffect(() => {
     fetch('/api/repos')
@@ -49,7 +64,10 @@ export default function RepoPage() {
       .then(repos => setRepo(repos.find(r => String(r.id) === String(id)) ?? null));
     fetch(`/api/repos/${id}/metrics`)
       .then(r => r.ok ? r.json() : null)
-      .then(setMetrics);
+      .then(data => {
+        setMetrics(data);
+        if (data?.sync_status === 'running') openSyncStream();
+      });
     fetch(`/api/repos/${id}/sync-history`)
       .then(r => r.ok ? r.json() : [])
       .then(setSyncHistory);
@@ -75,6 +93,7 @@ export default function RepoPage() {
 
   const totalPages = Math.ceil(total / limit);
   const [owner, repoName] = (repo?.full_name ?? '/').split('/');
+  const effectiveStatus = liveSync?.sync_status ?? metrics?.sync_status;
 
   // derive opened-this-week / last-week from weekly_activity
   const activity = metrics?.weekly_activity ?? [];
@@ -104,21 +123,22 @@ export default function RepoPage() {
             <span className="text-muted-foreground font-mono text-lg">{owner}/</span>
             <span className="font-semibold text-3xl text-foreground tracking-tight">{repoName}</span>
           </div>
-          {metrics !== null && (
+          {(metrics !== null || liveSync !== null) && (
             <SyncBadge
-              status={metrics.sync_status}
-              lastSynced={metrics.last_synced_at}
+              status={effectiveStatus}
+              lastSynced={metrics?.last_synced_at}
+              itemsDone={liveSync?.sync_items_done}
             />
           )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={handleSync}
-            disabled={metrics?.sync_status === 'running'}
+            disabled={effectiveStatus === 'running'}
             className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-full text-sm font-semibold hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-opacity active:scale-95"
           >
-            <RefreshCw size={13} className={metrics?.sync_status === 'running' ? 'animate-spin' : ''} />
-            {metrics?.sync_status === 'running' ? 'Syncing…' : 'Sync now'}
+            <RefreshCw size={13} className={effectiveStatus === 'running' ? 'animate-spin' : ''} />
+            {effectiveStatus === 'running' ? 'Syncing…' : 'Sync now'}
           </button>
           {repo && (
             <a
@@ -437,12 +457,14 @@ function StateIcon({ type, state }) {
     : <CircleCheck size={16} className="text-state-closed" />;
 }
 
-function SyncBadge({ status, lastSynced }) {
+function SyncBadge({ status, lastSynced, itemsDone }) {
   if (status === 'running') {
     return (
       <span className="inline-flex items-center gap-1.5 text-xs font-medium text-state-syncing">
         <span className="w-1.5 h-1.5 rounded-full bg-state-syncing animate-pulse" />
-        Sync in progress
+        {itemsDone != null && itemsDone > 0
+          ? `Syncing… ${itemsDone.toLocaleString()} items`
+          : 'Sync in progress'}
       </span>
     );
   }

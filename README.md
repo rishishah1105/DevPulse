@@ -126,6 +126,7 @@ POST   /api/repos                     { url }
 DELETE /api/repos/:id
 POST   /api/repos/:id/sync            → 202, 409, 429
 GET    /api/repos/:id/sync-status
+GET    /api/repos/:id/sync-stream  (SSE — live progress)
 GET    /api/repos/github-discover
 
 GET    /api/repos/:id/items?type=&state=&stale=&page=&limit=
