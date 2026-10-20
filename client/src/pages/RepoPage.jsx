@@ -111,7 +111,7 @@ export default function RepoPage() {
           <button
             onClick={handleSync}
             disabled={metrics?.sync_status === 'running'}
-            className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-full text-sm font-semibold hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-opacity"
+            className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-full text-sm font-semibold hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-opacity active:scale-95"
           >
             <RefreshCw size={13} className={metrics?.sync_status === 'running' ? 'animate-spin' : ''} />
             {metrics?.sync_status === 'running' ? 'Syncing…' : 'Sync now'}
@@ -122,7 +122,7 @@ export default function RepoPage() {
               target="_blank"
               rel="noreferrer"
               aria-label="Open on GitHub"
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground border border-border hover:border-border-strong rounded-full px-4 py-2 transition-colors"
+              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground border border-border hover:border-border-strong rounded-full px-4 py-2 transition-colors active:scale-95"
             >
               <ExternalLink size={14} />
               Open on GitHub
@@ -157,6 +157,7 @@ export default function RepoPage() {
           ].map(card => (
             <motion.div
               key={card.label}
+              className="h-full"
               variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' } } }}
             >
               <StatCard {...card} />
@@ -238,7 +239,7 @@ export default function RepoPage() {
         <div className="w-px h-5 bg-border mx-1" />
         <button
           onClick={() => { setStale(s => !s); setPage(1); }}
-          className={`px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
+          className={`px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors active:scale-95 ${
             stale
               ? 'bg-state-stale/15 text-state-stale border border-state-stale/30'
               : 'bg-card-raised text-muted-foreground border border-transparent hover:border-border'
@@ -346,7 +347,7 @@ export default function RepoPage() {
           <button
             onClick={() => setPage(p => p - 1)}
             disabled={page === 1}
-            className="px-4 py-2 rounded-full border border-border hover:border-border-strong disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 rounded-full border border-border hover:border-border-strong disabled:opacity-40 disabled:cursor-not-allowed transition-colors active:scale-95"
           >
             Previous
           </button>
@@ -356,7 +357,7 @@ export default function RepoPage() {
           <button
             onClick={() => setPage(p => p + 1)}
             disabled={page === totalPages}
-            className="px-4 py-2 rounded-full border border-border hover:border-border-strong disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 rounded-full border border-border hover:border-border-strong disabled:opacity-40 disabled:cursor-not-allowed transition-colors active:scale-95"
           >
             Next
           </button>
@@ -371,22 +372,22 @@ export default function RepoPage() {
 function StatCard({ label, value, sub, highlight = false, empty = '—' }) {
   if (highlight) {
     return (
-      <div className="bg-primary rounded-[20px] p-5 flex flex-col gap-2">
+      <div className="bg-primary rounded-[20px] p-5 flex flex-col gap-2 h-full">
         <span className="text-xs font-semibold text-primary-foreground/70">{label}</span>
         <span className="text-4xl font-semibold text-primary-foreground font-mono tabular-nums leading-none">
           {value != null ? value : <span className="text-2xl opacity-50">{empty}</span>}
         </span>
-        {sub && <span className="text-xs text-primary-foreground/60 mt-auto">{sub}</span>}
+        <span className="text-xs text-primary-foreground/60 mt-auto">{sub ?? ' '}</span>
       </div>
     );
   }
   return (
-    <div className="bg-card border border-border rounded-[20px] p-5 flex flex-col gap-2">
+    <div className="bg-card border border-border rounded-[20px] p-5 flex flex-col gap-2 h-full">
       <span className="text-xs font-semibold text-muted-foreground">{label}</span>
       <span className="text-4xl font-semibold text-foreground font-mono tabular-nums leading-none">
         {value != null ? value : <span className="text-2xl text-subtle-foreground">{empty}</span>}
       </span>
-      {sub && <span className="text-xs text-subtle-foreground mt-auto">{sub}</span>}
+      <span className="text-xs text-subtle-foreground mt-auto">{sub ?? ' '}</span>
     </div>
   );
 }
@@ -437,7 +438,7 @@ function FilterPills({ options, value, onChange }) {
         <button
           key={opt.value}
           onClick={() => onChange(opt.value)}
-          className={`px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
+          className={`px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors active:scale-95 ${
             value === opt.value
               ? 'bg-primary text-primary-foreground'
               : 'bg-card-raised text-muted-foreground hover:text-foreground'

@@ -42,7 +42,7 @@ export default function App() {
               <span className="text-sm text-muted-foreground font-medium">{user.login}</span>
               <button
                 onClick={handleLogout}
-                className="text-sm text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-full border border-border hover:border-border-strong transition-colors"
+                className="text-sm text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-full border border-border hover:border-border-strong transition-colors active:scale-95"
               >
                 Sign out
               </button>
@@ -101,7 +101,7 @@ function LoginPage() {
 
         <a
           href="/api/auth/github"
-          className="w-full flex items-center justify-center gap-2.5 px-5 py-2.5 bg-primary text-primary-foreground rounded-full font-semibold text-sm hover:opacity-90 transition-opacity"
+          className="w-full flex items-center justify-center gap-2.5 px-5 py-2.5 bg-primary text-primary-foreground rounded-full font-semibold text-sm hover:opacity-90 transition-opacity active:scale-95"
         >
           <GitHubMark />
           Sign in with GitHub

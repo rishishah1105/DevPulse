@@ -124,7 +124,7 @@ export default function ReposPage() {
           <button
             key={tab}
             onClick={() => handleTabChange(tab)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer ${
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer active:scale-95 ${
               activeTab === tab
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-card border border-border text-muted-foreground hover:border-border-strong'
@@ -149,7 +149,7 @@ export default function ReposPage() {
               />
               <button
                 type="submit"
-                className="px-5 py-2 bg-primary text-primary-foreground rounded-full text-sm font-semibold hover:opacity-90 transition-opacity shrink-0 cursor-pointer"
+                className="px-5 py-2 bg-primary text-primary-foreground rounded-full text-sm font-semibold hover:opacity-90 transition-opacity shrink-0 cursor-pointer active:scale-95"
               >
                 Add repo
               </button>
@@ -217,7 +217,7 @@ export default function ReposPage() {
 
                         <button
                           onClick={() => handleSync(repo.id)}
-                          className="shrink-0 px-4 py-1.5 text-xs font-medium rounded-full border border-border hover:bg-primary hover:text-primary-foreground hover:border-primary text-muted-foreground cursor-pointer transition-colors"
+                          className="shrink-0 px-4 py-1.5 text-xs font-medium rounded-full border border-border hover:bg-primary hover:text-primary-foreground hover:border-primary text-muted-foreground cursor-pointer transition-colors active:scale-95"
                         >
                           {isRunning ? 'Retry sync' : 'Sync now'}
                         </button>
@@ -288,7 +288,7 @@ export default function ReposPage() {
                     <button
                       onClick={() => handleAddFromDiscover(repo)}
                       disabled={adding.has(repo.github_repo_id)}
-                      className="shrink-0 px-4 py-1.5 text-xs font-medium rounded-full border border-border hover:bg-primary hover:text-primary-foreground hover:border-primary text-muted-foreground cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="shrink-0 px-4 py-1.5 text-xs font-medium rounded-full border border-border hover:bg-primary hover:text-primary-foreground hover:border-primary text-muted-foreground cursor-pointer transition-colors active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {adding.has(repo.github_repo_id) ? 'Adding…' : 'Add'}
                     </button>
