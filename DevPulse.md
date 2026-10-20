@@ -131,6 +131,7 @@ devpulse/
 │       └── app.js
 ├── CLAUDE.md            how Claude Code works with me (imports this file)
 ├── DevPulse.md          this file
+├── STYLING.md           visual design (with the reference image in docs/)
 ├── DECISIONS.md
 ├── BUGS.md
 └── README.md
@@ -172,6 +173,8 @@ POST   /api/repos                  → { url } add a public repo
 DELETE /api/repos/:id              → stop tracking (removes the join row only)
 POST   /api/repos/:id/sync         → start a sync (202 Accepted, or 409 if running, 429 if cooling down)
 GET    /api/repos/:id/sync-status  → status + progress (polled by the UI)
+
+GET    /api/repos/github-discover      → public repos the signed-in user owns on GitHub (discovery tab)
 
 GET    /api/repos/:id/items?type=&state=&label=&assignee=&stale=&page=&limit=
 GET    /api/repos/:id/metrics

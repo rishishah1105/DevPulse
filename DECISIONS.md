@@ -60,6 +60,12 @@
 **Why:** if we saved the finish time, any issue updated *during* the sync (between start and finish) would fall in the gap — updated after the cursor we saved, but already missed by the sync that just ran. Using the start time means the next sync re-fetches anything that changed during the previous sync — a small overlap, but zero gaps.
 **Trade-off:** a few items get re-fetched and re-upserted on every incremental sync; the upsert's `WHERE updated_at_gh < EXCLUDED.updated_at_gh` clause makes this safe and idempotent.
 
+## GitHub discovery tab (scope addition)
+**Decision:** added a "Yours on GitHub" tab on the repos page that fetches the user's own public repos from `GET /user/repos` and lets them add one with a click.
+**Alternatives:** keep add-by-URL only; show contributed repos too.
+**Why:** reduces friction for the most common case (adding your own repo). Uses the existing session token — no new permissions needed. "Contributed to" repos aren't cleanly queryable without per-repo API calls, so they were left out.
+**Trade-off:** fetches up to 30 repos from GitHub on tab open — another network call, but cheap and lazy (only fires when the tab is clicked).
+
 ## Median vs average for time-to-close
 **Decision:** `percentile_cont(0.5)` (median) for time-to-close metric.
 **Alternatives:** arithmetic mean (average).

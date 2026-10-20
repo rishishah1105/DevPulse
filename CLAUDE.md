@@ -89,6 +89,7 @@ For these: explain the concept, give me the structure and steps, give hints when
 
 ## 9. UI
 
+- **Visual design lives in `STYLING.md`** (plus the reference image in the repo). Read it before any UI work and follow it; it takes priority over the general look described below.
 - A clean developer-tool look: readable tables, clear hierarchy, restrained colour, no decorative clutter.
 - Every data view has **loading, empty and error** states.
 - Works at common desktop and mobile widths; keyboard accessible.
