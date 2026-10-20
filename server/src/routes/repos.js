@@ -85,6 +85,19 @@ router.post('/', requireAuth, async (req, res) => {
   res.status(201).json(savedRepo);
 });
 
+// DELETE /api/repos/:id — stop tracking (removes join row only, keeps repo data)
+router.delete('/:id', requireAuth, async (req, res) => {
+  const repoId = parseInt(req.params.id, 10);
+  if (!(await userOwnsRepo(req.session.userId, repoId))) {
+    return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'repo not found' } });
+  }
+  await pool.query(
+    'DELETE FROM user_repositories WHERE user_id = $1 AND repository_id = $2',
+    [req.session.userId, repoId]
+  );
+  res.status(204).end();
+});
+
 // GET /api/repos/github-discover — user's own public GitHub repos (for discovery tab)
 router.get('/github-discover', requireAuth, async (req, res) => {
   const ghRes = await fetch('https://api.github.com/user/repos?type=owner&sort=updated&per_page=30', {

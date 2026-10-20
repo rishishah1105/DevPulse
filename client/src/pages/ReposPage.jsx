@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 
 export default function ReposPage() {
   const [repos, setRepos] = useState(null);
@@ -9,6 +9,8 @@ export default function ReposPage() {
   const [syncErrors, setSyncErrors] = useState({});
   const [syncStatuses, setSyncStatuses] = useState({});
   const intervals = useRef({});
+
+  const [confirmRemove, setConfirmRemove] = useState(null); // repo object or null
 
   const [activeTab, setActiveTab] = useState('tracked');
   const [githubRepos, setGithubRepos] = useState(null);
@@ -100,6 +102,12 @@ export default function ReposPage() {
     }
   }
 
+  async function handleRemove(repoId) {
+    await fetch(`/api/repos/${repoId}`, { method: 'DELETE' });
+    setConfirmRemove(null);
+    loadRepos();
+  }
+
   async function handleSync(repoId) {
     setSyncErrors(prev => ({ ...prev, [repoId]: '' }));
     const res = await fetch(`/api/repos/${repoId}/sync`, { method: 'POST' });
@@ -120,19 +128,27 @@ export default function ReposPage() {
     >
       {/* Tab pills */}
       <div className="flex gap-2">
-        {['tracked', 'discover'].map(tab => (
-          <button
-            key={tab}
-            onClick={() => handleTabChange(tab)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer active:scale-95 ${
-              activeTab === tab
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-card border border-border text-muted-foreground hover:border-border-strong'
-            }`}
-          >
-            {tab === 'tracked' ? 'Tracked' : 'Yours on GitHub'}
-          </button>
-        ))}
+        <button
+        onClick={() => handleTabChange('tracked')}
+        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer active:scale-95 ${
+          activeTab === 'tracked'
+            ? 'bg-primary text-primary-foreground'
+            : 'bg-card border border-border text-muted-foreground hover:border-border-strong'
+        }`}
+      >
+        Tracked
+      </button>
+      <div className="w-px h-6 bg-border-strong self-center" />
+      <button
+        onClick={() => handleTabChange('discover')}
+        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer active:scale-95 ${
+          activeTab === 'discover'
+            ? 'bg-primary text-primary-foreground'
+            : 'bg-card border border-border text-muted-foreground hover:border-border-strong'
+        }`}
+      >
+        Yours on GitHub
+      </button>
       </div>
 
       {/* ── Tracked tab ── */}
@@ -215,12 +231,20 @@ export default function ReposPage() {
                           </div>
                         </div>
 
-                        <button
-                          onClick={() => handleSync(repo.id)}
-                          className="shrink-0 px-4 py-1.5 text-xs font-medium rounded-full border border-border hover:bg-primary hover:text-primary-foreground hover:border-primary text-muted-foreground cursor-pointer transition-colors active:scale-95"
-                        >
-                          {isRunning ? 'Retry sync' : 'Sync now'}
-                        </button>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => handleSync(repo.id)}
+                            className="px-4 py-1.5 text-xs font-medium rounded-full border border-border hover:bg-primary hover:text-primary-foreground hover:border-primary text-muted-foreground cursor-pointer transition-colors active:scale-95"
+                          >
+                            {isRunning ? 'Retry sync' : 'Sync now'}
+                          </button>
+                          <button
+                            onClick={() => setConfirmRemove(repo)}
+                            className="px-4 py-1.5 text-xs font-medium rounded-full border border-border hover:bg-state-failed hover:text-black hover:border-state-failed text-muted-foreground cursor-pointer transition-colors active:scale-95"
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </div>
                       {syncErrors[repo.id] && (
                         <p className="px-5 pb-3 text-xs text-state-failed">{syncErrors[repo.id]}</p>
@@ -233,6 +257,50 @@ export default function ReposPage() {
           </div>
         </>
       )}
+
+      {/* ── Confirmation modal ── */}
+      <AnimatePresence>
+        {confirmRemove && (
+          <motion.div
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            onClick={() => setConfirmRemove(null)}
+          >
+            <motion.div
+              className="bg-card border border-border rounded-[20px] p-6 w-full max-w-sm flex flex-col gap-4"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex flex-col gap-1">
+                <h3 className="font-semibold text-foreground">Stop tracking this repository?</h3>
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-mono text-foreground">{confirmRemove.full_name}</span> will be removed from your list. You can add it again anytime.
+                </p>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setConfirmRemove(null)}
+                  className="px-4 py-2 text-sm font-medium rounded-full border border-border hover:border-border-strong text-muted-foreground cursor-pointer transition-colors active:scale-95"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleRemove(confirmRemove.id)}
+                  className="px-4 py-2 text-sm font-medium rounded-full bg-state-failed text-white hover:opacity-90 cursor-pointer transition-opacity active:scale-95"
+                >
+                  Remove
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Discover tab ── */}
       {activeTab === 'discover' && (
